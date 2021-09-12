@@ -9,7 +9,25 @@ const menuPrompt =
     type: 'list',
     name: 'menu',
     message: 'What would you like to do?.',
-    choices: ['View all Employees', 'View All Employees by Department', 'View All Employees By Role', 'Add Employee', 'Remove Employee', 'Update Employee Role', 'Update Employee Manager']
+    choices: ['View all Employees', 'View All Employees by Department', 'View All Employees By Role', 'Add Employee', 'Remove Employee', 'Add a Role', 'Add a Department',  'Update Employee Role']
+}
+function dashboard () {
+    const menuDisplay = 
+    `SELECT employees.id, CONCAT(first_name,' ',last_name) as full_name, roles.id as role_id, roles.title, roles.salary,
+    departments.id as dept_id ,departments.dep_name
+    FROM employees INNER JOIN roles 
+    on employees.role_id = roles.id INNER JOIN departments
+    on departments.id = roles.department_id 
+    ORDER BY employees.id `;
+    db.query(menuDisplay, (err, rows) => {
+        if (err) {
+            console.log({ error: err.message });
+            return;
+        }
+        console.log('\n')
+        console.table(rows)
+        return beginPrompts()
+    })
 }
 
 function getByRoles() {
@@ -122,36 +140,55 @@ function addEmployee() {
             type: 'input',
             name: 'lastName',
             message: 'Please spell last name?'
-        },
-        {
-            type: 'list',
-            name: 'role',
-            message: 'Please select role?',
-            choices: ['Sales', 'Engineering', 'Legal', 'Finance']
         }
     ]
-    
     inquirer.prompt(question)
     .then(answer => {
-        console.log(answer)
-        const sql = 
-        `INSERT INTO employees 
-        (first_name, last_name, role_id)
-        VALUES 
-        ('${answer.firstName}', '${answer.lastName}', ${(question[2].choices.indexOf(answer.role)+1)});`
-
-        db.query(sql, (err, rows) => {
-            if (err) {
-                console.log({ error: err.message });
-                return;
+        let roles = []
+        let selectedRole, arrayHolder
+        db.promise().query("Select title, id FROM roles").then(([rows,fields]) => {
+            rows.forEach(element => {
+                arrayHolder = rows;
+                roles.push(element.title);
+            });
+        })
+        .then(function(){
+            const roleQuestion = {
+                type: 'list',
+                name: 'roleSelected',
+                message: 'Select the role for the employee:',
+                choices: roles
             }
-            dashboard();
-            return beginPrompts();
-        });
+            inquirer.prompt(roleQuestion)
+            .then(nextAnswer => {
+                selectedRole = arrayHolder[(roleQuestion.choices.indexOf(nextAnswer.roleSelected))].id;
+                db.promise().query("Select title, id FROM roles").then(([rows,fields]) => {
+                    rows.forEach(element => {
+                        roles.push(element.dep_name);
+                    });
+                })
+                .then(function(){
+                    console.log(selectedRole)
+                    const sql = 
+                        `INSERT INTO employees 
+                        (first_name, last_name, role_id)
+                        VALUES ('${answer.firstName}', '${answer.lastName}', ${selectedRole});`
+                    db.query(sql, (err, rows) => {
+                        if (err) {
+                            console.log({ error: err.message });
+                            return;
+                        }
+                        if(rows){
+                            dashboard();
+                        }
+                    })
+                })   
+            })
+        })   
     })
 }   
 
-function remove() {
+function removeEmployee() {
     let names = []
     let employeeArray
     db.promise().query("Select CONCAT(first_name,' ',last_name) as Name, id FROM employees").then(([rows,fields]) => {
@@ -170,9 +207,7 @@ function remove() {
         inquirer.prompt(question)
         .then(answer => {
             let selected = question.choices.indexOf(answer.remove)
-            // console.log(employeeArray[selected].id)
-            const sql = `DELETE FROM employees
-            WHERE id = ${employeeArray[selected].id};`
+            const sql = `DELETE FROM employees WHERE id = ${employeeArray[selected].id};`
             db.query(sql, (err, rows) => {
                 if (err) {
                     console.log({ error: err.message });
@@ -184,39 +219,107 @@ function remove() {
     })   
 }
 
-function dashboard () {
-    const menuDisplay = 
-    `SELECT employees.id, CONCAT(first_name,' ',last_name) as full_name, roles.title, roles.salary, departments.dep_name
-    FROM employees INNER JOIN roles 
-    on employees.role_id = roles.id INNER JOIN departments
-    on departments.id = roles.department_id 
-    ORDER BY employees.id `;
-    db.query(menuDisplay, (err, rows) => {
-        if (err) {
-            console.log({ error: err.message });
-            return;
+function addRole() {
+    const question = [
+        {
+            type: 'input',
+            name: 'name',
+            message: 'What is the name of the new role?'
+        },
+        {
+            type: 'input',
+            name: 'pay',
+            message: 'How much is their salary?'
         }
-        console.table(rows)
-        return beginPrompts()
+    ]
+    inquirer.prompt(question)
+    .then(answer => {
+        let departments = []
+        let selected, arrayHolder
+        db.promise().query("Select dep_name, id FROM departments").then(([rows,fields]) => {
+            rows.forEach(element => {
+                arrayHolder = rows;
+                departments.push(element.dep_name);
+            });
+        })
+        .then(function(){
+            const deptQuestion = {
+                type: 'list',
+                name: 'deptSelected',
+                message: 'Select the department for the new role:',
+                choices: departments
+            }
+            inquirer.prompt(deptQuestion)
+            .then(nextAnswer => {
+                selected = arrayHolder[(deptQuestion.choices.indexOf(nextAnswer.deptSelected))].id;
+                const sql = 
+                    `INSERT INTO roles 
+                    (title, salary, department_id)
+                    VALUES ('${answer.name}', '${answer.pay}', ${selected});`
+                db.query(sql, (err, rows) => {
+                    if (err) {
+                        console.log({ error: err.message });
+                        return;
+                    }
+                    if(rows){
+                        db.query(`SELECT * FROM roles WHERE department_id = ${selected}`, (err, rows) => {
+                            if (err) {
+                                console.log({ error: err.message });
+                                return;
+                            }
+                            console.log('\n')
+                            console.table(rows)
+                            return beginPrompts()
+                        })
+                    }
+                }) 
+            })
+        })   
     })
+}   
 
-}
+function addDepartment() {
+    const question = [
+        {
+            type: 'input',
+            name: 'name',
+            message: 'What is the name of the new department?'
+        }
+    ]
+    inquirer.prompt(question)
+    .then(answer => {
+        db.promise().query(`INSERT INTO departments (dep_name) VALUES ('${answer.name}')`).then(([rows,fields]) => {
+        })
+        .then(()=>{
+            db.query('SELECT * FROM departments', (err, result) => {
+                if (err) {
+                    console.log({ error: err.message });
+                    return;
+                }
+                console.table(result);
+                beginPrompts()
+            })
+        })
+    })
+}   
 
 function beginPrompts() {
     inquirer.prompt(menuPrompt)
     .then(answer => {
+        console.log(menuPrompt.choices.indexOf(answer.menu))
         switch (menuPrompt.choices.indexOf(answer.menu)){
             case 0:  dashboard(); break;
             case 1:  getByDepartment(); break;
             case 2:  getByRoles(); break;
             case 3:  addEmployee(); break;
-            case 4:  remove(); break;
-            case 5:  remove(); break;
+            case 4:  removeEmployee(); break;
+            case 5:  addRole(); break;
+            case 6:  addDepartment(); break;
+            case 7:  updateEmployee(); break;
         }
     })
 }
 beginPrompts()
 
 
-// function getAll() {menuPrompt.choices.indexOf(an)}]
 
