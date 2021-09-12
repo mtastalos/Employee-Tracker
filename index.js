@@ -2,7 +2,6 @@ const inquirer = require('inquirer');
 // const command = require('./lib/commands.js');
 const db = require('./config/connection');
 const cTable = require('console.table');
-const { lookup } = require('dns');
 
 //Menu prompt
 const menuPrompt = 
@@ -20,8 +19,7 @@ async function getAllEmployees() {
             console.log({ error: err.message });
             return;
         }
-        console.table(rows)
-        dashboard()
+        dashboard();
     });
 }   
 
@@ -113,7 +111,6 @@ function addEmployee() {
                 console.log({ error: err.message });
                 return;
             }
-            dashboard()
         });
     })
 }   
@@ -146,7 +143,6 @@ function remove() {
                     console.log({ error: err.message });
                     return;
                 }
-                dashboard();
             });
         })
     })
@@ -166,17 +162,22 @@ function remove() {
 
 function dashboard () {
     const menuDisplay = 
-    `SELECT * FROM employees INNER JOIN roles 
+    `SELECT employees.id, CONCAT(first_name,' ',last_name) as full_name, roles.title, roles.salary, departments.dep_name
+    FROM employees INNER JOIN roles 
     on employees.role_id = roles.id INNER JOIN departments
-    on departments.id = roles.department_id `;
+    on departments.id = roles.department_id 
+    ORDER BY employees.id `;
 db.query(menuDisplay, (err, rows) => {
+    if (err) {
+        console.log({ error: err.message });
+        return;
+    }
     console.table(rows)
     return beginPrompts()
 })
 
 }
 
-// dashboard()
 function beginPrompts() {
     inquirer.prompt(menuPrompt)
     .then(answer => {
