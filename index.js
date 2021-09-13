@@ -295,6 +295,7 @@ function updateEmployee() {
         inquirer.prompt(question)
         .then(answer => {
             let selected = employeeArray[question.choices.indexOf(answer.employee)].id
+            employeeArray = employeeArray[question.choices.indexOf(answer.employee)]
             const sql = `
                 SELECT employees.id, CONCAT(first_name,' ',last_name) as full_name, roles.id as role_id, roles.title, roles.salary, departments.id as dept_id ,departments.dep_name
                 FROM employees INNER JOIN roles 
@@ -315,7 +316,6 @@ function updateEmployee() {
                 }
                 inquirer.prompt(selection)
                 .then(answer => {
-                    console.log(employeeArray)
                     let selectedUpdate = selection.choices.indexOf(answer.pick);
                     switch (selectedUpdate) {
                         case 0:  inquirer.prompt(
@@ -350,21 +350,36 @@ function updateEmployee() {
                                 })
                             })
                         break;
-                        case 2:  inquirer.prompt(
-                            {
-                            type: 'input',
-                            name: 'case',
-                            message: 'Enter in new role_id:'
-                            })
-                            .then(answer => {
-                                db.query(`UPDATE employees SET role_id = '${answer.case}' WHERE id = ${selected}`, (err, rows) => {
-                                    if (err) {
-                                        console.log({ error: err.message });
-                                        return;
-                                    }
-                                    dashboard()
+                        case 2:  
+                            let options = []
+                            let rolesArray
+                            db.promise().query("Select title, id FROM roles").then(([rows,fields]) => {
+                                rows.forEach(element => {
+                                    options.push(element.title);
+                                });
+                                rolesArray = rows;
+                            }).
+                            then(()=> {
+                                const option =
+                                {
+                                type: 'list',
+                                name: 'case',
+                                message: 'Which role would you like to change it too?',
+                                choices: options
+                                }
+                                inquirer.prompt(option)
+                                .then(nextquestion => {
+                                    let decision = rolesArray[option.choices.indexOf(nextquestion.case)].id
+                                    db.query(`UPDATE employees SET role_id = '${decision}' WHERE id = ${employeeArray.id}`, (err, rows) => {
+                                        if (err) {
+                                            console.log({ error: err.message });
+                                            return;
+                                        }
+                                        dashboard()
+                                    })
                                 })
                             })
+                            
                         break;
                     }
                     
