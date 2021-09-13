@@ -102,33 +102,6 @@ function getByDepartment() {
     })   
 }   
 
-// function getByManager() {
-//     const question = {
-//         type: 'list',
-//         name: 'manager',
-//         message: 'Which management group would you like to look up?',
-//         choices: ['Sales', 'Engineering', 'Legal', 'Finance']
-//     }
-    
-//     inquirer.prompt(question)
-//     .then(answer => {
-//         console.log((question.choices.indexOf(answer.department)+1))
-//         const sql = `SELECT * 
-//         FROM employees INNER JOIN roles 
-//         on employees.role_id = roles.id INNER JOIN departments
-//         on departments.id = roles.department_id  
-//         WHERE departments.id = ${(question.choices.indexOf(answer.department)+1)};`
-//         db.query(sql, (err, rows) => {
-//             if (err) {
-//                 console.log({ error: err.message });
-//                 return;
-//             }
-//             console.log(rows)
-//         });
-//     })
-    
-// }
-
 function addEmployee() {
     const question = [
         {
@@ -201,7 +174,7 @@ function removeEmployee() {
         const question = {
             type: 'list',
             name: 'remove',
-            message: 'Which department would you like to look up?',
+            message: 'Which employee would you like to remove?',
             choices: names
         }
         inquirer.prompt(question)
@@ -302,6 +275,105 @@ function addDepartment() {
         })
     })
 }   
+
+function updateEmployee() {
+    let names = []
+    let employeeArray
+    db.promise().query("Select CONCAT(first_name,' ',last_name) as Name, first_name, last_name, role_id, id FROM employees").then(([rows,fields]) => {
+        employeeArray = rows
+        rows.forEach(element => {
+            names.push(element.Name);
+        });
+    })
+    .then(function(){
+        const question = {
+            type: 'list',
+            name: 'employee',
+            message: 'Which employee would you like to update?',
+            choices: names
+        }
+        inquirer.prompt(question)
+        .then(answer => {
+            let selected = employeeArray[question.choices.indexOf(answer.employee)].id
+            const sql = `
+                SELECT employees.id, CONCAT(first_name,' ',last_name) as full_name, roles.id as role_id, roles.title, roles.salary, departments.id as dept_id ,departments.dep_name
+                FROM employees INNER JOIN roles 
+                on employees.role_id = roles.id INNER JOIN departments
+                on departments.id = roles.department_id 
+                WHERE employees.id = ${selected};`
+            db.query(sql, (err, rows) => {
+                if (err) {
+                    console.log({ error: err.message });
+                    return;
+                }
+                console.table(rows)
+                const selection = {
+                    type: 'list',
+                    name: 'pick',
+                    message: 'What would you like to update:',
+                    choices: ['First name', 'Last name', 'Role id']
+                }
+                inquirer.prompt(selection)
+                .then(answer => {
+                    console.log(employeeArray)
+                    let selectedUpdate = selection.choices.indexOf(answer.pick);
+                    switch (selectedUpdate) {
+                        case 0:  inquirer.prompt(
+                            {
+                            type: 'input',
+                            name: 'case',
+                            message: 'Enter in new first name:'
+                            })
+                            .then(answer => {
+                                db.query(`UPDATE employees SET first_name = '${answer.case}' WHERE id = ${selected}`, (err, rows) => {
+                                    if (err) {
+                                        console.log({ error: err.message });
+                                        return;
+                                    }
+                                    dashboard()
+                                })
+                            })
+                        break;
+                        case 1:  inquirer.prompt(
+                            {
+                            type: 'input',
+                            name: 'case',
+                            message: 'Enter in new last name:'
+                            })
+                            .then(answer => {
+                                db.query(`UPDATE employees SET last_name = '${answer.case}' WHERE id = ${selected}`, (err, rows) => {
+                                    if (err) {
+                                        console.log({ error: err.message });
+                                        return;
+                                    }
+                                    dashboard()
+                                })
+                            })
+                        break;
+                        case 2:  inquirer.prompt(
+                            {
+                            type: 'input',
+                            name: 'case',
+                            message: 'Enter in new role_id:'
+                            })
+                            .then(answer => {
+                                db.query(`UPDATE employees SET role_id = '${answer.case}' WHERE id = ${selected}`, (err, rows) => {
+                                    if (err) {
+                                        console.log({ error: err.message });
+                                        return;
+                                    }
+                                    dashboard()
+                                })
+                            })
+                        break;
+                    }
+                    
+                })
+            });
+        })
+    })   
+}
+
 
 function beginPrompts() {
     inquirer.prompt(menuPrompt)
